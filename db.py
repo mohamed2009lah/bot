@@ -2,11 +2,11 @@ import sqlite3
 
 DB = "bot.db"
 
-def conn():
+def get_conn():
     return sqlite3.connect(DB, check_same_thread=False)
 
 def init():
-    c = conn().cursor()
+    c = get_conn().cursor()
 
     c.execute("""
     CREATE TABLE IF NOT EXISTS users(
@@ -28,5 +28,5 @@ def init():
     )
     """)
 
-    conn().commit()
-    conn().close()
+    c.connection.commit()
+    c.connection.close()
