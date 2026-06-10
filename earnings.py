@@ -1,9 +1,9 @@
 import asyncio
-from db import conn
+from db import get_conn
 from api import stats
 
 async def update_earnings(bot):
-    c = conn().cursor()
+    c = get_conn().cursor()
 
     c.execute("SELECT id,user_id,short,last FROM links")
     rows = c.fetchall()
@@ -17,7 +17,6 @@ async def update_earnings(bot):
         delta = earned - last
         share = delta * 0.7
 
-        # user balance
         c.execute("""
         UPDATE users SET balance=balance+?, total=total+?
         WHERE user_id=?
@@ -25,5 +24,5 @@ async def update_earnings(bot):
 
         c.execute("UPDATE links SET last=? WHERE id=?", (earned, i))
 
-    conn().commit()
-    conn().close()
+    c.connection.commit()
+    c.connection.close()
