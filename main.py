@@ -11,7 +11,7 @@ from telegram.ext import (
 )
 
 from config import TOKEN, ADMIN_IDS
-from db import init, conn
+from db import init, get_conn
 from api import shorten
 from earnings import update_earnings
 from admin import broadcast
@@ -22,10 +22,12 @@ WAIT_LINK, WAIT_BROADCAST = range(2)
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     u = update.effective_user
 
-    c = conn().cursor()
-    c.execute("INSERT OR IGNORE INTO users(user_id,username) VALUES(?,?)",
+    c = get_conn()
+    cursor = c.cursor()
+    cursor.execute("INSERT OR IGNORE INTO users(user_id,username) VALUES(?,?)",
               (u.id, u.username or "user"))
-    conn().commit()
+    c.commit()
+    c.close()
 
     kb = [
         [InlineKeyboardButton("🔗 اختصار", callback_data="short")],
@@ -52,7 +54,7 @@ async def cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return WAIT_LINK
 
     if q.data == "bal":
-        c = conn().cursor()
+        c = get_conn().cursor()
         c.execute("SELECT balance FROM users WHERE user_id=?", (uid,))
         bal = c.fetchone()[0]
         await q.edit_message_text(f"💰 رصيدك: {bal:.3f}$")
@@ -66,18 +68,20 @@ async def cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def link(update: Update, context: ContextTypes.DEFAULT_TYPE):
     url = update.message.text
 
-    short = await shorten(url)
+    short_url = await shorten(url)
 
-    if not short:
+    if not short_url:
         await update.message.reply_text("❌ فشل")
         return ConversationHandler.END
 
-    c = conn().cursor()
-    c.execute("INSERT INTO links(user_id,short) VALUES(?,?)",
-              (update.effective_user.id, short))
-    conn().commit()
+    c = get_conn()
+    cursor = c.cursor()
+    cursor.execute("INSERT INTO links(user_id,short) VALUES(?,?)",
+              (update.effective_user.id, short_url))
+    c.commit()
+    c.close()
 
-    await update.message.reply_text(f"✅ تم:\n{short}")
+    await update.message.reply_text(f"✅ تم:\n{short_url}")
     return ConversationHandler.END
 
 # ================= BROADCAST =================
