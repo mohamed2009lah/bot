@@ -1,5 +1,4 @@
 from db import get_conn
-from points import points_system
 import random
 import string
 
@@ -7,6 +6,7 @@ def generate_ref_code():
     return ''.join(random.choices(string.ascii_letters + string.digits, k=8))
 
 def add_referral(new_user_id, referrer_id):
+    """إضافة مدعو جديد وإعطاء النقاط للداعي"""
     c = get_conn().cursor()
     
     # تحديث عدد المدعوين
@@ -14,14 +14,15 @@ def add_referral(new_user_id, referrer_id):
     c.connection.commit()
     c.connection.close()
     
-    # إضافة نقاط للداعي
+    # إضافة نقاط للداعي (استيراد متأخر لتجنب الاستيراد الدائري)
     try:
+        from points import points_system
         points_system.add_referral_points(referrer_id)
-    except:
-        pass  # إذا لم يتم تهيئة نظام النقاط بعد
+    except Exception as e:
+        print(f"تعذر إضافة نقاط الدعوة: {e}")
 
 def process_referral_commission(earned_amount, user_id):
-    """معالجة عمولة الإحالة 10%"""
+    """معالجة عمولة الإحالة 10% من الأرباح"""
     c = get_conn().cursor()
     c.execute("SELECT referred_by FROM users WHERE user_id=?", (user_id,))
     row = c.fetchone()
