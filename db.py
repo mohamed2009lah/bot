@@ -8,6 +8,7 @@ def get_conn():
 def init():
     c = get_conn().cursor()
 
+    # جدول المستخدمين
     c.execute("""
     CREATE TABLE IF NOT EXISTS users(
         user_id INTEGER PRIMARY KEY,
@@ -21,6 +22,7 @@ def init():
     )
     """)
 
+    # جدول الروابط
     c.execute("""
     CREATE TABLE IF NOT EXISTS links(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -32,6 +34,7 @@ def init():
     )
     """)
 
+    # جدول السحوبات
     c.execute("""
     CREATE TABLE IF NOT EXISTS withdraws(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,6 +46,7 @@ def init():
     )
     """)
 
+    # جدول الدعم
     c.execute("""
     CREATE TABLE IF NOT EXISTS support_tickets(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -51,6 +55,49 @@ def init():
         reply TEXT,
         status TEXT DEFAULT 'open',
         created_at TEXT
+    )
+    """)
+
+    # جداول نظام النقاط
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS points(
+        user_id INTEGER PRIMARY KEY,
+        balance INTEGER DEFAULT 0,
+        total_earned INTEGER DEFAULT 0,
+        total_spent INTEGER DEFAULT 0,
+        last_daily_bonus TEXT,
+        FOREIGN KEY(user_id) REFERENCES users(user_id)
+    )
+    """)
+
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS points_transactions(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        amount INTEGER,
+        type TEXT,
+        description TEXT,
+        created_at TEXT
+    )
+    """)
+
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS points_pricing(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        amount INTEGER,
+        price REAL,
+        active INTEGER DEFAULT 1
+    )
+    """)
+
+    # جداول الإعلانات
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS ad_views(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        ad_id INTEGER,
+        service TEXT,
+        viewed_at TEXT
     )
     """)
 
