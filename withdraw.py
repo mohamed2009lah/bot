@@ -1,91 +1,86 @@
 from db import get_conn
-from config import ADMIN_IDS, MIN_WITHDRAW
+from config import ADMIN_IDS
 from datetime import datetime
 
-async def request_withdraw(update, context):
+async def support_message(update, context):
     user_id = update.effective_user.id
-    args = context.args
+    msg = update.message.text
 
-    if len(args) < 2:
-        await update.message.reply_text(
-            f"❌ استخدم: /withdraw <المبلغ> <عنوان Binance>\n\n"
-            f"📌 الحد الأدنى: {MIN_WITHDRAW}$"
-        )
-        return
+    c = get_conn()
+    cursor = c.cursor()
+    cursor.execute("INSERT INTO support_tickets(user_id, message, created_at) VALUES(?,?,?)",
+                   (user_id, msg, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+    ticket_id = cursor.lastrowid
+    c.commit()
+    username = update.effective_user.username or "بدون معرف"
 
-    try:
-        amount = float(args[0])
-    except:
-        await update.message.reply_text("❌ مبلغ غير صالح")
-        return
-
-    wallet = args[1]
-    min_withdraw = MIN_WITHDRAW
-
-    c = get_conn().cursor()
-    c.execute("SELECT balance FROM users WHERE user_id=?", (user_id,))
-    row = c.fetchone()
-    balance = row[0] if row else 0
-
-    if amount < min_withdraw:
-        await update.message.reply_text(f"❌ الحد الأدنى للسحب: {min_withdraw}$")
-        c.connection.close()
-        return
-
-    if amount > balance:
-        await update.message.reply_text(f"❌ رصيدك غير كافٍ. رصيدك: {balance:.3f}$")
-        c.connection.close()
-        return
-
-    # إنشاء طلب السحب
-    c.execute("INSERT INTO withdraws(user_id, amount, wallet, request_date) VALUES(?,?,?,?)",
-              (user_id, amount, wallet, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
-    c.execute("UPDATE users SET balance=balance-? WHERE user_id=?", (amount, user_id))
-    c.connection.commit()
-
-    # معلومات إضافية للإدارة
-    c.execute("SELECT username, join_date, referrals_count FROM users WHERE user_id=?", (user_id,))
-    user_info = c.fetchone()
-    c.execute("SELECT COUNT(*) FROM links WHERE user_id=?", (user_id,))
-    links_count = c.fetchone()[0]
-    c.execute("SELECT SUM(earned) FROM links WHERE user_id=?", (user_id,))
-    total_from_links = c.fetchone()[0] or 0
+    # معلومات إضافية
+    cursor.execute("SELECT balance, referrals_count FROM users WHERE user_id=?", (user_id,))
+    user_info = cursor.fetchone()
     
-    # رصيد النقاط
     try:
         from points import points_system
         points_balance = points_system.get_balance(user_id)
     except:
         points_balance = 0
-    
-    c.connection.close()
-
-    # إرسال إشعار للإدارة
-    admin_msg = f"""
-📥 **طلب سحب جديد**
-
-👤 المستخدم: {user_info[0]} ({user_id})
-💰 المبلغ: {amount:.3f}$
-🏦 المحفظة: `{wallet}`
-📅 تاريخ التسجيل: {user_info[1]}
-🔗 عدد الروابط: {links_count}
-👥 عدد المدعوين: {user_info[2]}
-💵 أرباح الروابط: {total_from_links:.3f}$
-⭐ رصيد النقاط: {points_balance}
-
-للموافقة: `/approve_{user_id}_{amount}`
-للرفض: `/reject_{user_id}_{amount}`
-    """
 
     for admin_id in ADMIN_IDS:
         try:
-            await context.bot.send_message(admin_id, admin_msg)
+            await context.bot.send_message(
+                admin_id,
+                f"📩 **رسالة دعم #{ticket_id}**\n"
+                f"👤 المستخدم: {username} ({user_id})\n"
+                f"💰 الرصيد: {user_info[0]:.3f}$\n"
+                f"⭐ النقاط: {points_balance}\n"
+                f"👥 المدعوين: {user_info[1]}\n"
+                f"📝 الرسالة: {msg}\n\n"
+                f"للرد: `/reply {ticket_id} <الرد>`"
+            )
         except:
             pass
 
-    await update.message.reply_text(
-        f"✅ **تم تقديم طلب السحب**\n\n"
-        f"💰 المبلغ: {amount:.3f}$\n"
-        f"🏦 المحفظة: `{wallet}`\n"
-        f"📌 سيتم المراجعة خلال 24 ساعة"
-    )
+    await update.message.reply_text("✅ تم إرسال رسالتك للإدارة، سنرد عليك قريباً")
+    c.close()
+
+async def reply_to_user(update, context):
+    user_id = update.effective_user.id
+    if user_id not in ADMIN_IDS:
+        await update.message.reply_text("❌ هذا الأمر للإدارة فقط")
+        return
+
+    args = context.args
+    if len(args) < 2:
+        await update.message.reply_text("❌ استخدم: /reply <رقم التذكرة> <الرد>")
+        return
+
+    try:
+        ticket_id = int(args[0])
+    except:
+        await update.message.reply_text("❌ رقم تذكرة غير صالح")
+        return
+
+    reply_text = " ".join(args[1:])
+
+    c = get_conn().cursor()
+    c.execute("SELECT user_id FROM support_tickets WHERE id=? AND status='open'", (ticket_id,))
+    row = c.fetchone()
+
+    if not row:
+        await update.message.reply_text("❌ التذكرة غير موجودة أو تم الرد عليها مسبقاً")
+        c.connection.close()
+        return
+
+    target_user = row[0]
+    c.execute("UPDATE support_tickets SET reply=?, status='closed' WHERE id=?", (reply_text, ticket_id))
+    c.connection.commit()
+    c.connection.close()
+
+    try:
+        await context.bot.send_message(
+            target_user,
+            f"📬 **رد الإدارة على تذكرتك #{ticket_id}:**\n\n{reply_text}\n\n"
+            f"🆘 إذا احتجت مساعدة إضافية، تواصل معنا مجدداً"
+        )
+        await update.message.reply_text(f"✅ تم إرسال الرد للمستخدم {target_user}")
+    except:
+        await update.message.reply_text("⚠️ تم حفظ الرد لكن تعذر إرساله للمستخدم (قد يكون حظر البوت)")
