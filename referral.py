@@ -1,4 +1,5 @@
 from db import get_conn
+from points import points_system
 import random
 import string
 
@@ -10,6 +11,9 @@ def add_referral(new_user_id, referrer_id):
     c.execute("UPDATE users SET referrals_count = referrals_count + 1 WHERE user_id=?", (referrer_id,))
     c.connection.commit()
     c.connection.close()
+    
+    # إضافة نقاط للداعي
+    points_system.add_referral_points(referrer_id)
 
 def process_referral_commission(earned_amount, user_id):
     c = get_conn().cursor()
