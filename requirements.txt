@@ -5,4 +5,3 @@ pytesseract
 Pillow
 yt-dlp
 gTTS
-spleeter
