@@ -46,7 +46,7 @@ def init():
     )
     """)
 
-    # جدول الدعم
+    # جدول الدعم الفني
     c.execute("""
     CREATE TABLE IF NOT EXISTS support_tickets(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -58,7 +58,7 @@ def init():
     )
     """)
 
-    # جداول نظام النقاط
+    # ========== جداول نظام النقاط ==========
     c.execute("""
     CREATE TABLE IF NOT EXISTS points(
         user_id INTEGER PRIMARY KEY,
@@ -90,7 +90,7 @@ def init():
     )
     """)
 
-    # جداول الإعلانات
+    # ========== جداول الإعلانات ==========
     c.execute("""
     CREATE TABLE IF NOT EXISTS ad_views(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
