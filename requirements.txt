@@ -1,0 +1,8 @@
+python-telegram-bot[job-queue]==20.7
+aiohttp
+python-dotenv
+pytesseract
+Pillow
+yt-dlp
+gTTS
+spleeter
