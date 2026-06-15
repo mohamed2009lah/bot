@@ -416,8 +416,8 @@ async def main():
         app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_callback))
     app.job_queue.run_repeating(job, interval=1800, first=10)
 
-    # ✅ الإصلاح هنا: استخدمنا app بدلاً من app.bot
-    await app.drop_pending_updates()
+    # 🛡️ حذف webhook السابق وإسقاط التحديثات المعلقة
+    await app.bot.delete_webhook(drop_pending_updates=True)
 
     PORT = int(os.environ.get("PORT", 8443))
     WEBHOOK_URL = os.environ.get("WEBHOOK_URL", "")
