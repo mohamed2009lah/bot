@@ -386,7 +386,8 @@ def main():
             WAIT_BROADCAST: [MessageHandler(filters.TEXT & ~filters.COMMAND, bc)],
             WAIT_SUPPORT: [MessageHandler(filters.TEXT & ~filters.COMMAND, support_msg)],
         },
-        fallbacks=[CommandHandler("cancel", cancel)]
+        fallbacks=[CommandHandler("cancel", cancel)],
+        per_message=True  # ← تم إضافته لضمان تتبع الأزرار
     )
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("withdraw", request_withdraw))
@@ -416,10 +417,8 @@ def main():
     app.job_queue.run_repeating(job, interval=1800, first=10)
 
     # ---------- تشغيل آمن ----------
-    # استخدام Webhook إذا تم توفير الرابط، وإلا استخدام Polling بطريقة آمنة
     WEBHOOK_URL = os.environ.get("WEBHOOK_URL", "")
     if WEBHOOK_URL:
-        # سيتم استدعاء run_webhook الذي يدير الحلقة بنفسه
         app.run_webhook(
             listen="0.0.0.0",
             port=int(os.environ.get("PORT", 8443)),
@@ -427,7 +426,6 @@ def main():
             webhook_url=f"{WEBHOOK_URL}/webhook"
         )
     else:
-        # استخدام run_polling() الذي يتولى إدارة الحلقة بدون asyncio.run
         print("✅ البوت يعمل (Polling)...")
         app.run_polling()
 
