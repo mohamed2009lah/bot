@@ -1,8 +1,7 @@
-import os, warnings
+import os, warnings, asyncio
 from telegram.warnings import PTBUserWarning
 warnings.filterwarnings("ignore", category=PTBUserWarning)
 
-import asyncio
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, LabeledPrice
 from telegram.ext import (
@@ -374,7 +373,7 @@ async def successful_payment_callback(update, context):
 async def job(context):
     await update_earnings(context.bot)
 
-async def main():
+def main():
     init()
     points_system.init_tables()
     ads_system.init_tables()
@@ -416,18 +415,21 @@ async def main():
         app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_callback))
     app.job_queue.run_repeating(job, interval=1800, first=10)
 
-    # 🛡️ حذف webhook السابق وإسقاط التحديثات المعلقة
-    await app.bot.delete_webhook(drop_pending_updates=True)
-
-    PORT = int(os.environ.get("PORT", 8443))
+    # ---------- تشغيل آمن ----------
+    # استخدام Webhook إذا تم توفير الرابط، وإلا استخدام Polling بطريقة آمنة
     WEBHOOK_URL = os.environ.get("WEBHOOK_URL", "")
     if WEBHOOK_URL:
-        await app.bot.set_webhook(url=f"{WEBHOOK_URL}/{TOKEN}")
-        print(f"✅ Webhook set on {WEBHOOK_URL}")
-        app.run_webhook(listen="0.0.0.0", port=PORT, url_path=TOKEN, webhook_url=f"{WEBHOOK_URL}/{TOKEN}")
+        # سيتم استدعاء run_webhook الذي يدير الحلقة بنفسه
+        app.run_webhook(
+            listen="0.0.0.0",
+            port=int(os.environ.get("PORT", 8443)),
+            url_path="webhook",
+            webhook_url=f"{WEBHOOK_URL}/webhook"
+        )
     else:
+        # استخدام run_polling() الذي يتولى إدارة الحلقة بدون asyncio.run
         print("✅ البوت يعمل (Polling)...")
         app.run_polling()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
