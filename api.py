@@ -4,8 +4,7 @@ from config import API_KEY
 async def shorten(url, alias=None):
     try:
         params = {"api": API_KEY, "url": url, "format": "json"}
-        if alias:
-            params["alias"] = alias
+        if alias: params["alias"] = alias
         async with aiohttp.ClientSession() as s:
             r = await s.get("https://shrinkearn.com/api", params=params)
             d = await r.json()
