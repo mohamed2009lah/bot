@@ -1,4 +1,8 @@
-import os, asyncio
+import os, warnings
+from telegram.warnings import PTBUserWarning
+warnings.filterwarnings("ignore", category=PTBUserWarning)
+
+import asyncio
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, LabeledPrice
 from telegram.ext import (
@@ -17,17 +21,13 @@ from points import points_system
 from ads import ads_system
 from admin_panel import admin_panel
 from middleware import middleware
-
-# استيراد الخدمات
 from ocr import OCRProcessor
 from downloader import VideoDownloader
 from tts import TextToSpeech
-from separator import AudioSeparator
 
 ocr = OCRProcessor()
 downloader = VideoDownloader()
 tts = TextToSpeech()
-separator = AudioSeparator()
 
 WAIT_LINK, WAIT_BROADCAST, WAIT_SUPPORT = range(3)
 
@@ -47,7 +47,7 @@ async def daily_cmd(update, context):
 
 async def buy_points_cmd(update, context):
     pricing = points_system.get_pricing_list()
-    msg = "🛒 **شراء نقاط:**\n\n"
+    msg = "🛒 شراء نقاط:\n\n"
     kb = []
     for amt, price, stars in pricing:
         msg += f"⭐ {amt} نقطة = {price:.2f}$ | ⭐{stars} نجمة\n"
@@ -240,19 +240,15 @@ async def button_handler(update, context):
         c.connection.close(); return ConversationHandler.END
     elif data.startswith("stars_"):
         if not PAYMENT_PROVIDER_TOKEN:
-            await q.message.reply_text("❌ الدفع بالنجوم غير مفعل حالياً")
+            await q.message.reply_text("❌ الدفع بالنجوم غير مفعل")
             c.connection.close(); return ConversationHandler.END
         amt = int(data.split("_")[1])
         stars_needed, err = points_system.buy_points_with_stars(uid, amt)
         if err: await q.message.reply_text(err); c.connection.close(); return ConversationHandler.END
         await context.bot.send_invoice(
-            chat_id=uid,
-            title="شراء نقاط",
-            description=f"شراء {amt} نقطة",
-            payload=f"points_{amt}",
-            provider_token=PAYMENT_PROVIDER_TOKEN,
-            currency="XTR",
-            prices=[LabeledPrice(label=f"{amt} نقطة", amount=stars_needed)]
+            chat_id=uid, title="شراء نقاط", description=f"شراء {amt} نقطة",
+            payload=f"points_{amt}", provider_token=PAYMENT_PROVIDER_TOKEN,
+            currency="XTR", prices=[LabeledPrice(label=f"{amt} نقطة", amount=stars_needed)]
         )
         c.connection.close(); return ConversationHandler.END
     elif data == "stats":
@@ -288,9 +284,7 @@ async def ocr_cmd(update, context):
     ok, msg, skip = await middleware.check_and_process(uid, 'ocr', context)
     if not ok: await update.message.reply_text(msg); return
     if not skip: await update.message.reply_text(msg)
-    photo = None
-    if update.message.photo: photo = update.message.photo[-1]
-    elif update.message.reply_to_message and update.message.reply_to_message.photo: photo = update.message.reply_to_message.photo[-1]
+    photo = update.message.photo[-1] if update.message.photo else (update.message.reply_to_message.photo[-1] if update.message.reply_to_message and update.message.reply_to_message.photo else None)
     if not photo: await update.message.reply_text("📸 أرسل صورة"); return
     wait = await update.message.reply_text("🔍 جارٍ استخراج النص...")
     text = await ocr.extract_from_photo(photo)
@@ -339,24 +333,7 @@ async def speak_cmd(update, context):
         os.remove(path); await wait.delete()
 
 async def separate_cmd(update, context):
-    uid = update.effective_user.id
-    ok, msg, skip = await middleware.check_and_process(uid, 'separate', context)
-    if not ok: await update.message.reply_text(msg); return
-    if not skip: await update.message.reply_text(msg)
-    if not (update.message.audio or update.message.voice): await update.message.reply_text("🎵 أرسل ملفاً صوتياً"); return
-    wait = await update.message.reply_text("🎵 فصل...")
-    file = update.message.audio or update.message.voice
-    tmp = f"temp_{os.urandom(4).hex()}.mp3"
-    await file.download_to_drive(tmp)
-    res, err = await separator.separate(tmp)
-    if err: await wait.edit_text(err); os.remove(tmp); return
-    if res:
-        await wait.edit_text("📤 إرسال...")
-        for k, path in res.items():
-            with open(path,'rb') as f: await update.message.reply_audio(f, caption=f"🎤 {k}")
-            os.remove(path)
-        await wait.delete()
-    os.remove(tmp)
+    await update.message.reply_text("🎵 خدمة فصل الصوت غير متوفرة حاليًا بسبب صيانة فنية. سنعيدها قريبًا.")
 
 async def link(update, context):
     url = update.message.text
@@ -383,25 +360,21 @@ async def support_msg(update, context):
 async def cancel(update, context):
     await update.message.reply_text("❌ ألغيت"); return ConversationHandler.END
 
-# ---------- معالج الدفع بالنجوم ----------
 async def pre_checkout_callback(update, context):
     query = update.pre_checkout_query
-    if query.invoice_payload.startswith("points_"):
-        await query.answer(ok=True)
-    else:
-        await query.answer(ok=False, error_message="خطأ في الطلب")
+    await query.answer(ok=True) if query.invoice_payload.startswith("points_") else await query.answer(ok=False, error_message="خطأ")
 
 async def successful_payment_callback(update, context):
     payment = update.message.successful_payment
     if payment.invoice_payload.startswith("points_"):
         amt = int(payment.invoice_payload.split("_")[1])
         points_system.add_points(update.effective_user.id, amt, 'buy_stars', f'شراء {amt} نقطة بالنجوم')
-        await update.message.reply_text(f"✅ تم شراء {amt} نقطة بنجاح! شكراً لدفعك.")
+        await update.message.reply_text(f"✅ تم شراء {amt} نقطة بنجاح!")
 
 async def job(context):
     await update_earnings(context.bot)
 
-def main():
+async def main():
     init()
     points_system.init_tables()
     ads_system.init_tables()
@@ -416,7 +389,6 @@ def main():
         },
         fallbacks=[CommandHandler("cancel", cancel)]
     )
-
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("withdraw", request_withdraw))
     app.add_handler(CommandHandler("reply", reply_to_user))
@@ -443,8 +415,17 @@ def main():
         app.add_handler(PreCheckoutQueryHandler(pre_checkout_callback))
         app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_callback))
     app.job_queue.run_repeating(job, interval=1800, first=10)
-    print("✅ البوت يعمل")
-    app.run_polling()
+
+    await app.bot.drop_pending_updates()
+    PORT = int(os.environ.get("PORT", 8443))
+    WEBHOOK_URL = os.environ.get("WEBHOOK_URL", "")
+    if WEBHOOK_URL:
+        await app.bot.set_webhook(url=f"{WEBHOOK_URL}/{TOKEN}")
+        print(f"✅ Webhook set on {WEBHOOK_URL}")
+        app.run_webhook(listen="0.0.0.0", port=PORT, url_path=TOKEN, webhook_url=f"{WEBHOOK_URL}/{TOKEN}")
+    else:
+        print("✅ البوت يعمل (Polling)...")
+        app.run_polling()
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
