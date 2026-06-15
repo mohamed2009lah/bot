@@ -24,13 +24,14 @@ class Middleware:
 
     def get_service_cost_info(self):
         c = points_system.service_costs
-        msg = "📊 تكاليف الخدمات:\n"
-        msg += f"🔗 اختصار: {c['shorten']} نقطة\n"
-        msg += f"📸 OCR: {c['ocr']} نقاط\n"
-        msg += f"📥 تحميل: {c['download']} نقاط\n"
-        msg += f"🎙️ TTS: {c['speak']} نقاط\n"
-        msg += f"🎵 فصل الصوت: {c['separate']} نقاط\n"
-        msg += "\n💡 ادعُ أصدقاء (5 نقاط) أو /buy_points"
-        return msg
+        return (
+            "📊 تكاليف الخدمات:\n"
+            f"🔗 اختصار: {c.get('shorten', 1)} نقطة\n"
+            f"📸 OCR: {c.get('ocr', 4)} نقاط\n"
+            f"📥 تحميل: {c.get('download', 5)} نقاط\n"
+            f"🎙️ TTS: {c.get('speak', 3)} نقاط\n"
+            f"🎵 فصل الصوت: غير متاح حاليًا\n"
+            "\n💡 ادعُ أصدقاء (5 نقاط) أو /buy_points"
+        )
 
 middleware = Middleware()
